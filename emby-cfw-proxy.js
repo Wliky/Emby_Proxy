@@ -12,8 +12,9 @@ const CONFIG = {
 };
 
 // 默认前端服务地址（兜底转发）
-// 当请求路径不匹配代理规则时，所有请求转发到此地址
-const FRONTEND_URL = "http://line.xmsl.org:80";
+// 当请求路径不匹配代理规则时，所有请求转发到此地址。
+// 替换一下前端域名即可
+const FRONTEND_URL = "http://example.com:80";
 
 /**
  * 核心请求处理函数
