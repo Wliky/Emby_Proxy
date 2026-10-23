@@ -1,23 +1,35 @@
 # Emby Proxy (Cloudflare Worker)
 
-本仓库包含三类脚本：
+基于 Cloudflare Worker 的 Emby 反代脚本集合，解决地域拦截/访问限制，并优化流媒体转发体验。
 
-- `emby-cfw-auto-proxy.js`：通用自动代理（原有文件，保留）
-- `emby-cfw-proxy.js`：前后端分离代理（原有文件，保留）
-- `release-fast-1.6.0/worker.js`：路径路由版 Emby 代理（本次新增）
+## 文件说明
 
-## 1. 本次更新说明
+- `emby-cfw-auto-proxy.js`：通用自动反代。无需改代码，访问 `https://<Worker域名>/<你的Emby服务器地址:端口>` 即可代理。
+- `emby-cfw-proxy.js`：前后端分离反代。需在代码内填写前端登录域名，后端推流地址自动转发。
+- `emby-cfw-fast-proxy.js`：路径路由极速版。在 `PATH_ROUTES` 配置路径到上游的映射，访问 `https://<Worker域名>/<routeKey>` 选线。
 
-- 新增目录：`release-fast-1.6.0/`
-- 新增文件：`release-fast-1.6.0/worker.js`
-- `PATH_ROUTES` 已改为示例值，不包含任何真实上游地址
-- 原有脚本与目录保持不变
+## 使用方法
 
-## 2. 路径路由版（release-fast-1.6.0）
+### 通用自动反代
 
-该版本按 `https://你的域名/{routeKey}` 选线到不同上游，适合多线路 Emby 反代。
+```
+https://<Worker域名>/<你的Emby服务器地址:端口>
+```
 
-### 2.1 `PATH_ROUTES` 示例（仅示例）
+示例：
+
+```
+https://xxx.xxx.workers.dev/emby.example.com:8096
+```
+
+### 前后端分离反代
+
+1. 在 `emby-cfw-proxy.js` 内填写前端登录域名（如 `FRONTEND_URL`）。
+2. 直接访问 `https://<Worker域名>`，后端推流地址自动转发。
+
+### 路径路由极速版
+
+配置示例（仅示例，部署前替换为自己的上游）：
 
 ```js
 const PATH_ROUTES = {
@@ -27,46 +39,45 @@ const PATH_ROUTES = {
 };
 ```
 
-请在部署前替换成你自己的上游地址。
+访问方式：
 
-### 2.2 访问方式
+```
+https://<Worker域名>/demo1
+https://<Worker域名>/demo2
+https://<Worker域名>/demo3
+```
 
-- `https://你的域名/demo1`
-- `https://你的域名/demo2`
-- `https://你的域名/demo3`
+健康检查：
 
-根路径和健康检查：
+```
+https://<Worker域名>/health
+```
 
-- `https://你的域名/`
-- `https://你的域名/health`
+## 核心特性
 
-### 2.3 核心行为
+- 智能缓存：图片资源边缘节点缓存，提升封面/图片加载速度
+- 特征隐藏：清除 Cloudflare 追踪头，避免被识别节点特征并拦截
+- 流媒体优化：视频流零缓存透传，WebSocket 直通
+- 兼容兜底：路径路由版支持 `/emby` 前缀兜底候选
 
-- 流媒体请求：不缓存、尽量零干预透传（保留 Range）
-- 图片请求：边缘缓存 + 浏览器缓存
-- 列表请求（`/Items`）：短缓存
-- `PlaybackInfo`：可选改写为代理路径
-- 上游候选：主候选 + `/emby` 前缀兜底（兼容客户端有无 `/emby`）
+## 部署
 
-## 3. Cloudflare Worker 部署
+1. 打开 Cloudflare Dashboard，选择你的域名
+2. 进入 Workers & Pages → 创建应用程序 → 创建 Worker
+3. 删除编辑器默认代码
+4. 粘贴对应脚本代码
+5. 点击保存并部署，记录分配的 Worker 域名
 
-1. 新建 Worker。
-2. 粘贴目标脚本内容：
-   - 路径路由版：`release-fast-1.6.0/worker.js`
-   - 或保留使用原有两个脚本之一。
-3. 修改 `PATH_ROUTES` 为你的实际配置。
-4. 绑定自定义域名并发布。
-
-## 4. 快速验证
+## 验证
 
 ```bash
-curl -s https://你的域名/health
+curl -s https://<Worker域名>/health
 ```
 
 ```bash
-curl -I "https://你的域名/demo1/Items/1/Images/Primary?tag=abc"
+curl -I "https://<Worker域名>/demo1/Items/1/Images/Primary?tag=abc"
 ```
 
 ```bash
-curl -I -H "Range: bytes=0-1023" "https://你的域名/demo1/videos/1/stream.mp4?static=true"
+curl -I -H "Range: bytes=0-1023" "https://<Worker域名>/demo1/videos/1/stream.mp4?static=true"
 ```
